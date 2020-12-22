@@ -21,8 +21,8 @@ class Markowitz:
         self.Data = Data
         self.asset_names = self.Data.columns  # remember to drop the column ['DATE']
         self.num_assets = len(self.Data.columns)
-        self.kappas = [0.001,0.01 ]#[0.001, 0.01, 0.1, 1, 10, 100, 1000]
-        self.look_backs = [5, 21]#[5, 21, 42, 63, 125, 189, 250, 500]  # [7, 30, 90, 180] #number of days to look back
+        self.kappas = [0.001, 0.01, 0.1, 1, 10, 100, 1000]
+        self.look_backs = [5, 21, 42, 63, 125, 189, 250, 500]  # [7, 30, 90, 180] #number of days to look back
         self.rebalancing_frequency = [5, 21]
         self.P = 250  # monthly frequency
         self.Rho = Rho  # target annualized
@@ -72,6 +72,7 @@ class Markowitz:
 
             else:
                 break
+
     @ property
     def hyperParameterGrid(self):
         grid = [(kappa, look_back, freq) for kappa in self.kappas for look_back in self.look_backs for freq in
@@ -116,7 +117,7 @@ class Markowitz:
                                                                                      :-self.lag].values).sum(
             axis=1)
 
-        return r, W.values
+        return r, W.to_numpy()
 
     def parallelGridSearch(self):
 
@@ -126,34 +127,37 @@ class Markowitz:
         pool.close()
         pool.join()
         ret_mat = [i[0] for i in res]
-        W_mat = np.array([i[1].flatten() for i in res])
+
+        meanLeverage, meanWeight  = [], []
+        for i in res:
+            meanWeight.append( i[1].sum(axis=1).mean())
+            meanLeverage.append(np.abs(i[1]).sum(axis=1).mean())
 
         performance_dict = dict(zip(hyperparameters, ret_mat))  # record the performance of each combination of hyper-parameter
-
         df = pd.DataFrame.from_dict(performance_dict, orient="index")
-        return df, W_mat
+
+        return df, meanWeight, meanLeverage
 
 
     def summary(self, output_path):
         #global output_path
-        performance_df, W = self.parallelGridSearch() # key is combination of hyper-parameter, value is the return vector
-        pd.DataFrame(W).to_csv("W.csv")
+        performance_df, meanW, meanL = self.parallelGridSearch() # key is combination of hyper-parameter, value is the return vector
         result_df = pd.DataFrame(index=performance_df.index)
         result_df["annual return"] = performance_df.apply(lambda x: float(self.P * np.mean(x)), axis=1)
-        result_df["annual risk"]   = performance_df.apply(lambda x: float(np.sqrt(self.P) * np.std(x, ddof=0)), axis=1)
-        result_df["sharpe ratio"]  = result_df["annual return"] / result_df["annual risk"]
+        result_df["annual risk"] = performance_df.apply(lambda x: float(np.sqrt(self.P) * np.std(x, ddof=0)), axis=1)
+        result_df["sharpe ratio"] = result_df["annual return"] / result_df["annual risk"]
         result_df['max_drop_down'] = performance_df.apply(PeakToTrough, axis=1)
         result_df['max_time_under_water '] = performance_df.apply(UnderWater, axis=1)
-        try:
-            result_df["avg_leverage"] = np.abs(W).mean(axis=1).mean()
-            result_df["avg_weight"] = W.mean(axis=1).mean()
-        except:
-            print(W)
+
+
+        result_df["avg_leverage"] = meanL
+        result_df["avg_weight"] = meanW
+
         result_df.round(2).to_csv(join(output_path, 'directStockSelection.csv'))
 
         r_df = performance_df.T
         r_df = r_df + 1
-        r_df =  r_df.apply(np.cumprod, axis=0)
+        r_df = r_df.apply(np.cumprod, axis=0)
         plot = r_df.plot(legend=True)
         fig = plot.get_figure()
         fig.savefig(join(output_path, 'Plot\\res.png'))
