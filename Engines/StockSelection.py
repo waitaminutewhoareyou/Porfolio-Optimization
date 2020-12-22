@@ -144,8 +144,11 @@ class Markowitz:
         result_df["sharpe ratio"]  = result_df["annual return"] / result_df["annual risk"]
         result_df['max_drop_down'] = performance_df.apply(PeakToTrough, axis=1)
         result_df['max_time_under_water '] = performance_df.apply(UnderWater, axis=1)
-        result_df["avg_leverage"] = np.abs(W).mean(axis=1).mean()
-        result_df["avg_weight"] = W.mean(axis=1).mean()
+        try:
+            result_df["avg_leverage"] = np.abs(W).mean(axis=1).mean()
+            result_df["avg_weight"] = W.mean(axis=1).mean()
+        except:
+            print(W)
         result_df.round(2).to_csv(join(output_path, 'directStockSelection.csv'))
 
         r_df = performance_df.T

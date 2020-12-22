@@ -18,7 +18,6 @@ T_test, n = R_test.shape
 P = 12
 
 # Optimization on training set
-
 def train(rho):
 
     mu = R_train.mean(axis=0)  # n by 1
