@@ -57,21 +57,21 @@ class Markowitz:
         return solver(*args)
 
 
-    def postProcess(self, partial_w, normalization_factors, num_periods, test_start, freq):
-        # unpack the weight vectors and sigma factor
-        w = pd.Series(index=self.asset_names)
-        w[partial_w.index] = partial_w.values
-
-        sigma_factor = pd.Series(index=self.asset_names)
-        sigma_factor[normalization_factors.index] = normalization_factors
-
-        for _ in range(freq):
-            if W.shape[0] < num_periods - test_start:
-                W = W.append(w, ignore_index=True).fillna(0)
-                sigma_factors = sigma_factors.append(sigma_factor, ignore_index=True).fillna(0)
-
-            else:
-                break
+    # def postProcess(self, partial_w, normalization_factors, num_periods, test_start, freq):
+    #     # unpack the weight vectors and sigma factor
+    #     w = pd.Series(index=self.asset_names)
+    #     w[partial_w.index] = partial_w.values
+    #
+    #     sigma_factor = pd.Series(index=self.asset_names)
+    #     sigma_factor[normalization_factors.index] = normalization_factors
+    #
+    #     for _ in range(freq):
+    #         if W.shape[0] < num_periods - test_start:
+    #             W = W.append(w, ignore_index=True).fillna(0)
+    #             sigma_factors = sigma_factors.append(sigma_factor, ignore_index=True).fillna(0)
+    #
+    #         else:
+    #             break
 
     @ property
     def hyperParameterGrid(self):
