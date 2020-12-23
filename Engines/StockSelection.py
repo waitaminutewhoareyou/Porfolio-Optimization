@@ -64,7 +64,7 @@ class Markowitz:
 
     def train(self, grid_point):
 
-        kappa, look_back, freq = grid_point
+        Rho, kappa, look_back, freq = grid_point
         num_periods = self.Data.shape[0]
         W = pd.DataFrame(columns=self.asset_names)  # container of w's
         sigma_factors = pd.DataFrame(columns=self.asset_names)  # container of normalization factors
@@ -78,7 +78,7 @@ class Markowitz:
             w_old = np.array([]) if W.empty else W[porfolio_universe].iloc[-1].fillna(0).to_numpy()
             save_stdout = sys.stdout
             sys.stdout = open('trash', 'w')
-            partial_w = self.solve(markowitzSolver, R_train_normalized, w_old, self.rho, kappa)
+            partial_w = self.solve(markowitzSolver, R_train_normalized, w_old, Rho/self.P, kappa)
             sys.stdout = save_stdout
 
             # unpack the weight vectors and sigma factor
@@ -102,7 +102,9 @@ class Markowitz:
 
         return r, W.to_numpy()
 
-    def evaluateSharpe(self, grid_point):
+    def evaluateSharpe(self, grid_points_dict):
+
+        grid_point = (grid_points_dict['Rho'], grid_points_dict['kappa'], grid_points_dict['look_back'], grid_points_dict['rebalancing_frequency'] )
         r, W = self.train(grid_point)
         annualized_ret = float(self.P * np.mean(r))
         annualized_std = float(np.sqrt(self.P) * np.std(r, ddof=0))
@@ -119,7 +121,7 @@ class Markowitz:
 
         meanLeverage, meanWeight  = [], []
         for i in res:
-            meanWeight.append( i[1].sum(axis=1).mean())
+            meanWeight.append(i[1].sum(axis=1).mean())
             meanLeverage.append(np.abs(i[1]).sum(axis=1).mean())
 
         performance_dict = dict(zip(hyperparameters, ret_mat))  # record the performance of each combination of hyper-parameter
