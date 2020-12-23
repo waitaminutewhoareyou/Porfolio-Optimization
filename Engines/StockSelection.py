@@ -56,30 +56,13 @@ class Markowitz:
     def solve(self, solver, *args):
         return solver(*args)
 
-
-    # def postProcess(self, partial_w, normalization_factors, num_periods, test_start, freq):
-    #     # unpack the weight vectors and sigma factor
-    #     w = pd.Series(index=self.asset_names)
-    #     w[partial_w.index] = partial_w.values
-    #
-    #     sigma_factor = pd.Series(index=self.asset_names)
-    #     sigma_factor[normalization_factors.index] = normalization_factors
-    #
-    #     for _ in range(freq):
-    #         if W.shape[0] < num_periods - test_start:
-    #             W = W.append(w, ignore_index=True).fillna(0)
-    #             sigma_factors = sigma_factors.append(sigma_factor, ignore_index=True).fillna(0)
-    #
-    #         else:
-    #             break
-
     @ property
     def hyperParameterGrid(self):
         grid = [(kappa, look_back, freq) for kappa in self.kappas for look_back in self.look_backs for freq in
                 self.rebalancing_frequency]
         return grid
 
-    def evaluate(self, grid_point):
+    def train(self, grid_point):
 
         kappa, look_back, freq = grid_point
         num_periods = self.Data.shape[0]
@@ -119,11 +102,17 @@ class Markowitz:
 
         return r, W.to_numpy()
 
+    def evaluateSharpe(self, grid_point):
+        r, W = self.train(grid_point)
+        annualized_ret = float(self.P * np.mean(r))
+        annualized_std = float(np.sqrt(self.P) * np.std(r, ddof=0))
+        return annualized_ret/annualized_std
+
     def parallelGridSearch(self):
 
         hyperparameters = self.hyperParameterGrid
         pool = Pool(os.cpu_count()-1)
-        res = list(tqdm.tqdm(pool.imap(self.evaluate, hyperparameters), total=len(hyperparameters)))
+        res = list(tqdm.tqdm(pool.imap(self.train, hyperparameters), total=len(hyperparameters)))
         pool.close()
         pool.join()
         ret_mat = [i[0] for i in res]
