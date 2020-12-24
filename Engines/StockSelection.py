@@ -116,6 +116,8 @@ class Markowitz:
                                                                                      :-self.lag].values).sum(
             axis=1)
 
+
+
         return r, W.to_numpy()
 
     def parallelGridSearch(self):
@@ -137,6 +139,17 @@ class Markowitz:
         df = pd.DataFrame.from_dict(performance_dict, orient="index")
 
         return df, meanWeight, meanLeverage
+
+    def quickStat(self, r, W):
+        quick_df = pd.DataFrame()
+        quick_df["annual return"] = float(self.P * np.mean(x))
+        quick_df["annual risk"] = lambda x: float(np.sqrt(self.P) * np.std(x, ddof=0))
+        quick_df['sharpe ratio'] = quick_df['annual return'] / quick_df["annual risk"]
+        quick_df['max_drop_down'] = PeakToTrough(r)
+        quick_df['max_time_under_water'] = UnderWater(r)
+        quick_df["avg_leverage"] = W.abs().sum(axis=1).mean(axis=0)
+        quick_df['avg_weight'] = W.sum(axis=1).mean(axis=0)
+        return quick_df
 
     def evaluateSharpe(self, grid_points_dict):
 
@@ -182,7 +195,7 @@ class Markowitz:
             'rebalancing_frequency': hp.choice('rebalancing_frequency', self.gridDict['rebalancing_frequency'])
         }
 
-        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=max_iter,  timeout=120, trials=trials, show_progressbar=True)
+        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=max_iter,  timeout=302400, trials=trials, show_progressbar=True)
         pbar.close()
 
         print("best:")
@@ -209,7 +222,8 @@ class Markowitz:
         return best
 
 
-    def summary(self, output_path):
+
+    def metricsSummary(self, output_path):
         # key is combination of hyper-parameter, value is the return vector
         performance_df, meanW, meanL = self.parallelGridSearch()
         result_df = pd.DataFrame(index=performance_df.index)
@@ -217,7 +231,7 @@ class Markowitz:
         result_df["annual risk"] = performance_df.apply(lambda x: float(np.sqrt(self.P) * np.std(x, ddof=0)), axis=1)
         result_df["sharpe ratio"] = result_df["annual return"] / result_df["annual risk"]
         result_df['max_drop_down'] = performance_df.apply(PeakToTrough, axis=1)
-        result_df['max_time_under_water '] = performance_df.apply(UnderWater, axis=1)
+        result_df['max_time_under_water'] = performance_df.apply(UnderWater, axis=1)
 
 
         result_df["avg_leverage"] = meanL
