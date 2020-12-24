@@ -116,7 +116,7 @@ class Markowitz:
                                                                                      :-self.lag].values).sum(
             axis=1)
 
-
+        df = self.quickStat(r, W).to_csv(join(output_path, f'\\Intermediate Result\\{ Rho, kappa, look_back, freq}.csv'))
 
         return r, W.to_numpy()
 
@@ -142,8 +142,8 @@ class Markowitz:
 
     def quickStat(self, r, W):
         quick_df = pd.DataFrame()
-        quick_df["annual return"] = float(self.P * np.mean(x))
-        quick_df["annual risk"] = lambda x: float(np.sqrt(self.P) * np.std(x, ddof=0))
+        quick_df["annual return"] = float(self.P * np.mean(r))
+        quick_df["annual risk"] = float(np.sqrt(self.P) * np.std(r, ddof=0))
         quick_df['sharpe ratio'] = quick_df['annual return'] / quick_df["annual risk"]
         quick_df['max_drop_down'] = PeakToTrough(r)
         quick_df['max_time_under_water'] = UnderWater(r)
