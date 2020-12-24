@@ -1,10 +1,9 @@
 import pandas as pd
 from os.path import dirname, join
-from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 project_root = dirname(dirname(__file__))
 output_path = join(project_root, 'Result\\DirectStockSelection', "")
 from StockSelection import Markowitz
-from tqdm import tqdm
+
 
 df = pd.read_csv(join(project_root, "Data/ret/ret.csv"))
 df = df.pivot(index="DATE", columns="PERMNO", values="RET").sort_index()
@@ -14,6 +13,7 @@ df.to_csv(join(project_root, "Data/ret/ret_transformed.csv"))
 if __name__ == '__main__':
     # stock
     # data = pd.read_csv(join(project_root, "Data/ret/ret_transformed.csv"), index_col="DATE")
+
 
     # parallelSearch(data)
 
@@ -26,12 +26,8 @@ if __name__ == '__main__':
     'look_back':  [5, 21, 42, 63, 125, 189, 250, 500],
     'rebalancing_frequency':[5, 21]
 }
-    max_iter = 500
+
     model = Markowitz(data.iloc[3529:], dictionary)
     model.BayesianHyperOpt()
 
-    # trials = Trials()
-    #best = fmin(f, space4mark, algo=tpe.suggest, timeout=57600, trials=trials, verbose=True, show_progressbar=True)
-    # pbar.close()
-    #print('best:')
-    #print(best)
+

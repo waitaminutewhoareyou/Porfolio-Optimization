@@ -3,7 +3,7 @@ import os
 from os.path import dirname, join
 project_root = dirname(dirname(__file__))
 solver_path = join(project_root, 'Solvers')
-output_path = join(project_root, 'Results')
+output_path = join(project_root, 'Result',"")
 sys.path.insert(1, solver_path)
 import warnings
 warnings.filterwarnings("ignore")
@@ -158,16 +158,19 @@ class Markowitz:
     def f(self, params):
         sharpe_ratio = self.evaluateSharpe(params)
 
+        sharpe_ls.append(sharpe_ratio)
         pbar.set_postfix(
-            best_sharpe=f"{sharpe_ratio}",
+            best_sharpe=f"{max(sharpe_ls)}",
             refresh=True)
         pbar.update()
 
         return {'loss': - sharpe_ratio, 'status': STATUS_OK}
 
-    def BayesianHyperOpt(self, max_iter = 500):
+    def BayesianHyperOpt(self, max_iter = 1000):
         global pbar
+        global sharpe_ls
         pbar = tqdm(total=max_iter, desc="Hyperopt")
+        sharpe_ls = []
 
         trials = Trials()
 
@@ -179,8 +182,7 @@ class Markowitz:
             'rebalancing_frequency': hp.choice('rebalancing_frequency', self.gridDict['rebalancing_frequency'])
         }
 
-        # 46800
-        best = fmin(self.f, space4mark, algo=tpe.suggest, timeout=1800, trials=trials, show_progressbar=True)
+        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=max_iter,  timeout=120, trials=trials, show_progressbar=True)
         pbar.close()
 
         print("best:")
@@ -197,8 +199,12 @@ class Markowitz:
                                     'rebalancing_frequency': self.gridDict["rebalancing_frequency"][int(trials.idxs_vals[1]['rebalancing_frequency'][0])]
                                     })
 
+        print(output_path)
 
-        tpe_results.to_csv(join(output_path, '\\search path.csv'))
+        try:
+            tpe_results.to_csv(join(output_path, 'search path.csv'))
+        except PermissionError:
+            print(tpe_results)
 
         return best
 

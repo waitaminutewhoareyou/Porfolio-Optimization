@@ -60,6 +60,6 @@ def markowitzSolver(data, w_prev, rho, kappa):
             print(leverage, mu.dot(w), rho)
     except AttributeError as e:
         w = pd.Series(data=np.zeros(num_assets), index=assets_name[:num_assets])
-        print("Infeasible !")
+        print("Infeasible!")
 
     return w
