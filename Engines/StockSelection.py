@@ -116,7 +116,7 @@ class Markowitz:
                                                                                      :-self.lag].values).sum(
             axis=1)
 
-        df = self.quickStat(r, W).to_csv(join(output_path, f'\\Intermediate Result\\{ Rho, kappa, look_back, freq}.csv'))
+        # df = self.quickStat(r, W).to_csv(join(output_path, f'\\Intermediate Result\\{ Rho, kappa, look_back, freq}.csv'))
 
         return r, W.to_numpy()
 
@@ -158,6 +158,7 @@ class Markowitz:
         r, W = self.train(grid_point)
         annualized_ret = float(self.P * np.mean(r))
         annualized_std = float(np.sqrt(self.P) * np.std(r, ddof=0))
+
         try:
             sharpe_ratio = annualized_ret/annualized_std
         except:
@@ -165,8 +166,9 @@ class Markowitz:
             print("r is", r)
             print("return is", annualized_ret)
             print("std is", annualized_std)
-            sharpe_ratio = np.inf
-        return annualized_ret/annualized_std
+            sharpe_ratio = np.nan
+
+        return sharpe_ratio
 
     def f(self, params):
         sharpe_ratio = self.evaluateSharpe(params)
@@ -179,9 +181,10 @@ class Markowitz:
 
         return {'loss': - sharpe_ratio, 'status': STATUS_OK}
 
-    def BayesianHyperOpt(self, max_iter = 1000):
+    def BayesianHyperOpt(self, max_iter=1000):
         global pbar
         global sharpe_ls
+
         pbar = tqdm(total=max_iter, desc="Hyperopt")
         sharpe_ls = []
 
@@ -221,8 +224,6 @@ class Markowitz:
 
         return best
 
-
-
     def metricsSummary(self, output_path):
         # key is combination of hyper-parameter, value is the return vector
         performance_df, meanW, meanL = self.parallelGridSearch()
@@ -232,8 +233,6 @@ class Markowitz:
         result_df["sharpe ratio"] = result_df["annual return"] / result_df["annual risk"]
         result_df['max_drop_down'] = performance_df.apply(PeakToTrough, axis=1)
         result_df['max_time_under_water'] = performance_df.apply(UnderWater, axis=1)
-
-
         result_df["avg_leverage"] = meanL
         result_df["avg_weight"] = meanW
 
@@ -246,4 +245,3 @@ class Markowitz:
         fig = plot.get_figure()
         fig.savefig(join(output_path, 'Plot\\res.png'))
         plt.show()
-
