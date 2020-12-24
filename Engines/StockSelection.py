@@ -13,21 +13,30 @@ from PeakToTroughAndUnderWater import PeakToTrough, UnderWater
 from MarkowitzSolver import markowitzSolver
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
+from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
+from itertools import product
+import contextlib
 
+
+class DummyFile(object):
+    def write(self, x): pass
+
+@contextlib.contextmanager
+def nostdout():
+    save_stdout = sys.stdout
+    sys.stdout = DummyFile()
+    yield
+    sys.stdout = save_stdout
 
 class Markowitz:
 
-    def __init__(self, Data, Rho):
+    def __init__(self, Data, paramdict):
         self.Data = Data
         self.asset_names = self.Data.columns  # remember to drop the column ['DATE']
         self.num_assets = len(self.Data.columns)
-        self.kappas = [0.001, 0.01, 0.1, 1, 10, 100, 1000]
-        self.look_backs = [5, 21, 42, 63, 125, 189, 250, 500]  # [7, 30, 90, 180] #number of days to look back
-        self.rebalancing_frequency = [5, 21]
         self.P = 250  # monthly frequency
-        self.Rho = Rho  # target annualized
-        self.rho = self.Rho / self.P
         self.lag = 1
+        self.gridDict = paramdict
 
     def getPorfolioUniverse(self, df):
         return df.dropna().index
@@ -58,9 +67,12 @@ class Markowitz:
 
     @ property
     def hyperParameterGrid(self):
-        grid = [(kappa, look_back, freq) for kappa in self.kappas for look_back in self.look_backs for freq in
-                self.rebalancing_frequency]
-        return grid
+        grid = self.gridDict
+        lb, ub = grid['kappa']
+        np.linspace(lb, ub, num=10)
+        grid['kappa'] = np.linspace(lb, ub, num=10)
+
+        return list(product(*grid.values()))
 
     def train(self, grid_point):
 
@@ -76,10 +88,10 @@ class Markowitz:
                                                                                               num_periods)
 
             w_old = np.array([]) if W.empty else W[porfolio_universe].iloc[-1].fillna(0).to_numpy()
-            save_stdout = sys.stdout
-            sys.stdout = open('trash', 'w')
+            # save_stdout = sys.stdout
+            # sys.stdout = open('trash', 'w')
             partial_w = self.solve(markowitzSolver, R_train_normalized, w_old, Rho/self.P, kappa)
-            sys.stdout = save_stdout
+            # sys.stdout = save_stdout
 
             # unpack the weight vectors and sigma factor
             w = pd.Series(index=self.asset_names)
@@ -102,14 +114,6 @@ class Markowitz:
 
         return r, W.to_numpy()
 
-    def evaluateSharpe(self, grid_points_dict):
-
-        grid_point = (grid_points_dict['Rho'], grid_points_dict['kappa'], grid_points_dict['look_back'], grid_points_dict['rebalancing_frequency'] )
-        r, W = self.train(grid_point)
-        annualized_ret = float(self.P * np.mean(r))
-        annualized_std = float(np.sqrt(self.P) * np.std(r, ddof=0))
-        return annualized_ret/annualized_std
-
     def parallelGridSearch(self):
 
         hyperparameters = self.hyperParameterGrid
@@ -128,6 +132,51 @@ class Markowitz:
         df = pd.DataFrame.from_dict(performance_dict, orient="index")
 
         return df, meanWeight, meanLeverage
+
+    def evaluateSharpe(self, grid_points_dict):
+
+        grid_point = (grid_points_dict['Rho'], grid_points_dict['kappa'], grid_points_dict['look_back'], grid_points_dict['rebalancing_frequency'] )
+        r, W = self.train(grid_point)
+        annualized_ret = float(self.P * np.mean(r))
+        annualized_std = float(np.sqrt(self.P) * np.std(r, ddof=0))
+        try:
+            sharpe_ratio = annualized_ret/annualized_std
+        except:
+            print("Exception:")
+            print("r is", r)
+            print("return is", annualized_ret)
+            print("std is", annualized_std)
+            sharpe_ratio = 0
+        return annualized_ret/annualized_std
+
+    def f(self, params):
+        sharpe_ratio = self.evaluateSharpe(params)
+        return {'loss': - sharpe_ratio, 'status': STATUS_OK}
+
+    def BayesianHyperOpt(self):
+        trials = Trials()
+        lb, ub = self.gridDict['kappa']
+        space4mark = {
+            'Rho': hp.choice('Rho', self.gridDict['Rho']),
+            'kappa': hp.uniform('kappa', lb, ub),
+            'look_back': hp.choice('look_back', self.gridDict['look_back']),
+            'rebalancing_frequency': hp.choice('rebalancing_frequency', self.gridDict['look_back'])
+        }
+        # 46800
+        best = fmin(self.f, space4mark, algo=tpe.suggest ,timeout=27000, trials=trials, verbose=True, show_progressbar=True)
+        print("best:")
+        print(best)
+        for trial in trials.trials:
+            print(trial)
+
+        tpe_results = pd.DataFrame({'loss': [x['loss'] for x in trials.results],
+                                    'iteration': trials.idxs_vals[0]['x'],
+                                    'x': trials.idxs_vals[1]['x']})
+
+        print((tpe_results))
+
+
+        return best
 
 
     def summary(self, output_path):

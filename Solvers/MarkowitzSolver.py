@@ -40,7 +40,7 @@ def markowitzSolver(data, w_prev, rho, kappa):
     # Fix budget with a constraint
     # m.addConstr(w.sum() == 1, 'budget')
     m.addConstr(mu.dot(w) == rho, "target return")
-    m.addConstr(aux_vars.sum() <= 2, "gross exposure")
+    m.addConstr(aux_vars.sum() <= 1, "gross exposure")
 
     m.addConstrs((aux_vars[i] == gp.abs_(w[i]) for i in range(num_assets)))
     # Optimize model to find the minimum risk portfolio
