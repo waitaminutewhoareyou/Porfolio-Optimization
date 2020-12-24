@@ -54,8 +54,8 @@ def markowitzSolver(data, w_prev, rho, kappa):
         w = pd.Series(data=w, index=assets_name[:num_assets])
         leverage = np.sum(np.abs(sol[num_assets:]))
         try:
-            assert leverage <= 1
-            assert np.isclose(mu.dot(w), rho).all()
+            assert np.abs(leverage-1) <= 1e-5
+            assert np.abs(mu.dot(w) - rho) < 1e-5
         except AssertionError as e:
             print(leverage, mu.dot(w), rho)
     except AttributeError as e:
