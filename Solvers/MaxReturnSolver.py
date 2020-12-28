@@ -35,6 +35,7 @@ def markowitzSolver(data, w_prev, rho, kappa):
     # the historical correlation between stocks.
     regularization = gp.quicksum([w[i] ** 2 * var[i] for i in range(num_assets)])  # exclude risk-free cashflow
     portfolio_risk = ((data.dot(w) - rho) ** 2).sum() + regularization + shifting
+    portfolio_return = (data.dot(w) ** 2).sum() + regularization + shifting
     m.setObjective(portfolio_risk, gp.GRB.MINIMIZE)
 
     # Fix budget with a constraint

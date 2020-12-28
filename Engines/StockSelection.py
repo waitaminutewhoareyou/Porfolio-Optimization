@@ -93,9 +93,9 @@ class Markowitz:
                     partial_w = self.solve(markowitzSolver, R_train_normalized, w_old, Rho / self.P, kappa)
 
             # update progress
-            pbar.set_postfix(
-                rolling_optimization=f"{(test_period - test_start) // freq}/{(num_periods - test_start) // freq}",
-                refresh=True)
+            # pbar.set_postfix(
+            #     rolling_optimization=f"{(test_period - test_start) // freq}/{(num_periods - test_start) // freq}",
+            #     refresh=True)
 
             # unpack the weight vectors and sigma factor
             w = pd.Series(index=self.asset_names)
@@ -189,7 +189,6 @@ class Markowitz:
         sharpe_ls = []
 
         trials = Trials()
-
         lb, ub = self.gridDict['kappa']
         space4mark = {
             'Rho': hp.choice('Rho', self.gridDict['Rho']),
@@ -198,7 +197,8 @@ class Markowitz:
             'rebalancing_frequency': hp.choice('rebalancing_frequency', self.gridDict['rebalancing_frequency'])
         }
 
-        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=max_iter,  timeout=302400, trials=trials, show_progressbar=True)
+
+        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=max_iter,  timeout=1200, trials=trials, show_progressbar=True)
         pbar.close()
 
         print("best:")
