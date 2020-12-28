@@ -46,8 +46,8 @@ class Markowitz:
         porfolio_universe = self.getPorfolioUniverse(self.Data.iloc[min(test_period + self.lag, num_periods - 1), :])
         R_train = self.Data[porfolio_universe]
         R_train = R_train.iloc[max(0, test_period - look_back):test_period, :]
-        # Total number of NaN entries in a column must be less than 80% of total entries
-        R_train = R_train.loc[:, R_train.isnull().sum() < 0.8 * R_train.shape[0]].fillna(0)
+        # Total number of NaN entries in a column must be less than 50% of total entries
+        R_train = R_train.loc[:, R_train.isnull().sum() < 0.5 * R_train.shape[0]].fillna(0)
 
         R_train_normalized, normalization_factors = self.normalizeFactors(R_train)
         tradeable_universe = R_train_normalized.columns
@@ -60,9 +60,14 @@ class Markowitz:
     @ property
     def hyperParameterGrid(self):
         grid = self.gridDict
-        lb, ub = grid['kappa']
-        np.linspace(lb, ub, num=10)
-        grid['kappa'] = np.linspace(lb, ub, num=10)
+        lb_kappa, ub_kappa = grid['kappa']
+        grid['kappa'] = np.linspace(lb_kappa, ub_kappa, num=10)
+
+        lb_Rho, ub_Rho = grid['Rho']
+        grid['Rho'] = np.linspace(lb_Rho, ub_Rho, num=10)
+
+        lb_look_back, ub_look_back = grid['look_back']
+        grid['look_back'] = np.linspace(lb_look_back, ub_look_back, num=10)
 
         return list(product(*grid.values()))
 
@@ -81,7 +86,6 @@ class Markowitz:
 
             w_old = np.array([]) if W.empty else W[porfolio_universe].iloc[-1].fillna(0).to_numpy()
 
-
             try:
                 # silence the function while solving
                 save_stdout = sys.stdout
@@ -93,9 +97,9 @@ class Markowitz:
                     partial_w = self.solve(markowitzSolver, R_train_normalized, w_old, Rho / self.P, kappa)
 
             # update progress
-            # pbar.set_postfix(
-            #     rolling_optimization=f"{(test_period - test_start) // freq}/{(num_periods - test_start) // freq}",
-            #     refresh=True)
+            pbar.set_postfix(
+                rolling_optimization=f"{(test_period - test_start) // freq}/{(num_periods - test_start) // freq}",
+                refresh=True)
 
             # unpack the weight vectors and sigma factor
             w = pd.Series(index=self.asset_names)
@@ -153,7 +157,7 @@ class Markowitz:
 
     def evaluateSharpe(self, grid_points_dict):
 
-        grid_point = (grid_points_dict['Rho'], grid_points_dict['kappa'], grid_points_dict['look_back'],
+        grid_point = (grid_points_dict['Rho'], grid_points_dict['kappa'], int(grid_points_dict['look_back']),
                       grid_points_dict['rebalancing_frequency'])
         r, W = self.train(grid_point)
         annualized_ret = float(self.P * np.mean(r))
@@ -162,26 +166,23 @@ class Markowitz:
         try:
             sharpe_ratio = annualized_ret/annualized_std
         except:
-            print("Exception:")
-            print("r is", r)
-            print("return is", annualized_ret)
-            print("std is", annualized_std)
             sharpe_ratio = np.nan
 
-        return sharpe_ratio
+        return sharpe_ratio, annualized_ret
 
     def f(self, params):
-        sharpe_ratio = self.evaluateSharpe(params)
+        sharpe_ratio, ret = self.evaluateSharpe(params)
 
         sharpe_ls.append(sharpe_ratio)
         pbar.set_postfix(
-            best_sharpe=f"{max(sharpe_ls)}",
+            best_sharpe=f"{max(sharpe_ls):.2f}",
+            current_sharpe= f'{sharpe_ratio:.2f}',
             refresh=True)
         pbar.update()
 
-        return {'loss': - sharpe_ratio, 'status': STATUS_OK}
+        return {'loss': - sharpe_ratio, 'status': STATUS_OK, "ret":ret}
 
-    def BayesianHyperOpt(self, max_iter=1000):
+    def BayesianHyperOpt(self, max_iter=100):
         global pbar
         global sharpe_ls
 
@@ -189,16 +190,18 @@ class Markowitz:
         sharpe_ls = []
 
         trials = Trials()
-        lb, ub = self.gridDict['kappa']
+        lb_kappa, ub_kappa = self.gridDict['kappa']
+        lb_Rho, ub_Rho = self.gridDict['Rho']
+        lb_look_back, ub_look_back = self.gridDict['look_back']
         space4mark = {
-            'Rho': hp.choice('Rho', self.gridDict['Rho']),
-            'kappa': hp.uniform('kappa', lb, ub),
-            'look_back': hp.choice('look_back', self.gridDict['look_back']),
+            'Rho': hp.uniform('Rho', lb_Rho, ub_Rho),
+            'kappa': hp.uniform('kappa',  lb_kappa, ub_kappa),
+            'look_back': hp.quniform('look_back', lb_look_back,ub_look_back,1),
             'rebalancing_frequency': hp.choice('rebalancing_frequency', self.gridDict['rebalancing_frequency'])
         }
 
-
-        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=max_iter,  timeout=1200, trials=trials, show_progressbar=True)
+        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=100, timeout=19 * 60 * 60, trials=trials,
+                    show_progressbar=True)
         pbar.close()
 
         print("best:")
@@ -208,14 +211,13 @@ class Markowitz:
             print(trial)
 
         tpe_results = pd.DataFrame({'loss': [x['loss'] for x in trials.results],
+                                    'annual return': [x['ret'] for x in trials.results],
                                     'iteration': trials.idxs_vals[0]['Rho'],
-                                    'Rho': self.gridDict["Rho"][int(trials.idxs_vals[1]['Rho'][0])],
-                                    'kappa': trials.idxs_vals[1]['kappa'],
-                                    'look_back': self.gridDict["look_back"][int(trials.idxs_vals[1]['look_back'][0])],
-                                    'rebalancing_frequency': self.gridDict["rebalancing_frequency"][int(trials.idxs_vals[1]['rebalancing_frequency'][0])]
+                                    'Rho': trials.idxs_vals[1]['Rho'],
+                                    'kappa': trials.vals['kappa'],
+                                    'look_back': trials.vals['look_back'],
+                                    'rebalancing_frequency': [self.gridDict["rebalancing_frequency"][ix] for ix in trials.vals['rebalancing_frequency']]
                                     })
-
-        print(output_path)
 
         try:
             tpe_results.to_csv(join(output_path, 'search path.csv'))
