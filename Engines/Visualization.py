@@ -2,7 +2,13 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-data = pd.read_csv("C:\\Users\\apply\\Desktop\\JYH\\Quant Research\\Porfolio Optimization\\Optimizer\\Result\\normalization_column_3529-4779_with lag_adjusted.csv")
+
+from os.path import dirname, join
+project_root = dirname(dirname(__file__))
+solver_path = join(project_root, 'Solvers')
+output_path = join(project_root, 'Result',"")
+
+data = pd.read_csv( output_path + "search path_tpe_suggest.csv").dropna(inplace=True)
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 

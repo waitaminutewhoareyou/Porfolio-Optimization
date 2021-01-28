@@ -21,8 +21,10 @@ if __name__ == '__main__':
     data = pd.read_csv(join(project_root, "Data/return_2000_2018.csv"), index_col="DATE").applymap(lambda x: float(str(x).strip('%'))/100)
     dictionary = {'Rho': (0.2, 0.5), 'kappa': (0, 100), 'look_back': (5,500),'rebalancing_frequency':[5, 21]}
     model = Markowitz(data.iloc[3529:], dictionary)
-    model.BayesianHyperOpt()
-    # print(model.evaluateSharpe(dictionary))
+    model.BayesianHyperOpt(2)
+
+
+    # print(model.evaluateSharpe({'Rho':0.201090702, 'kappa':0.228925325, 'look_back':342, 'rebalancing_frequency':5}))
 
 
     # 2.2825760987812727

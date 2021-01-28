@@ -9,7 +9,7 @@ import warnings
 warnings.filterwarnings("ignore")
 import pandas as pd
 import numpy as np
-from tqdm import tqdm
+from tqdm import tqdm,trange
 from PeakToTroughAndUnderWater import PeakToTrough, UnderWater
 from MarkowitzSolver import markowitzSolver
 from matplotlib import pyplot as plt
@@ -46,9 +46,9 @@ class Markowitz:
         porfolio_universe = self.getPorfolioUniverse(self.Data.iloc[min(test_period + self.lag, num_periods - 1), :])
         R_train = self.Data[porfolio_universe]
         R_train = R_train.iloc[max(0, test_period - look_back):test_period, :]
-        # Total number of NaN entries in a column must be less than 50% of total entries
-        R_train = R_train.loc[:, R_train.isnull().sum() < 0.5 * R_train.shape[0]].fillna(0)
 
+        # Total number of NaN entries in a column must be less than 50% of total entries
+        R_train = R_train.loc[:, R_train.isnull().sum() < 1 * R_train.shape[0]].fillna(0)
         R_train_normalized, normalization_factors = self.normalizeFactors(R_train)
         tradeable_universe = R_train_normalized.columns
 
@@ -60,8 +60,8 @@ class Markowitz:
     @ property
     def hyperParameterGrid(self):
         grid = self.gridDict
-        lb_kappa, ub_kappa = grid['kappa']
-        grid['kappa'] = np.linspace(lb_kappa, ub_kappa, num=10)
+        # lb_kappa, ub_kappa = grid['kappa']
+        grid['kappa'] = np.linspace(*grid['kappa'], num=10)
 
         lb_Rho, ub_Rho = grid['Rho']
         grid['Rho'] = np.linspace(lb_Rho, ub_Rho, num=10)
@@ -79,7 +79,7 @@ class Markowitz:
         sigma_factors = pd.DataFrame(columns=self.asset_names)  # container of normalization factors
         test_start = look_back  # we start validation once enough data is available
 
-        for test_period in range(test_start, num_periods, freq):
+        for test_period in tqdm(range(test_start, num_periods, freq), desc='processed',leave=False, position=0):
 
             porfolio_universe, R_train_normalized, normalization_factors = self.preProcessing(test_period, look_back,
                                                                                               num_periods)
@@ -97,9 +97,12 @@ class Markowitz:
                     partial_w = self.solve(markowitzSolver, R_train_normalized, w_old, Rho / self.P, kappa)
 
             # update progress
-            pbar.set_postfix(
-                rolling_optimization=f"{(test_period - test_start) // freq}/{(num_periods - test_start) // freq}",
-                refresh=True)
+            try:
+                pbar.set_postfix(
+                    rolling_optimization=f"{(test_period - test_start) // freq}/{(num_periods - test_start) // freq}",
+                    refresh=True)
+            except:
+                print('No progress bar is set.')
 
             # unpack the weight vectors and sigma factor
             w = pd.Series(index=self.asset_names)
@@ -116,9 +119,11 @@ class Markowitz:
                     break
 
         R_test = self.Data.iloc[test_start:, :].fillna(0)
-        r = (R_test.iloc[self.lag:].values * sigma_factors.iloc[:-self.lag].values * W.iloc[
-                                                                                     :-self.lag].values).sum(
-            axis=1)
+        # r = (R_test.iloc[self.lag:].values * sigma_factors.iloc[:-self.lag].values * W.iloc[
+        #                                                                              :-self.lag].values).sum(
+        #     axis=1)
+
+        r = (R_test.iloc[self.lag:].values * W.iloc[:-self.lag].values).sum(axis=1)
 
         # df = self.quickStat(r, W).to_csv(join(output_path, f'\\Intermediate Result\\{ Rho, kappa, look_back, freq}.csv'))
 
@@ -156,7 +161,9 @@ class Markowitz:
         return quick_df
 
     def evaluateSharpe(self, grid_points_dict):
-
+        """:arg
+        grid_points_dict =  {'Rho':0.3, 'Kappa':0.1, 'look_back':250, 'rebalancing_frequency':21}
+        """
         grid_point = (grid_points_dict['Rho'], grid_points_dict['kappa'], int(grid_points_dict['look_back']),
                       grid_points_dict['rebalancing_frequency'])
         r, W = self.train(grid_point)
@@ -200,7 +207,7 @@ class Markowitz:
             'rebalancing_frequency': hp.choice('rebalancing_frequency', self.gridDict['rebalancing_frequency'])
         }
 
-        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=100, timeout=19 * 60 * 60, trials=trials,
+        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=100, timeout= 6 * 60 * 60, trials=trials,
                     show_progressbar=True)
         pbar.close()
 
@@ -220,7 +227,7 @@ class Markowitz:
                                     })
 
         try:
-            tpe_results.to_csv(join(output_path, 'search path.csv'))
+            tpe_results.to_csv(join(output_path, 'search path_with_gross_exposure_2.csv'))
         except PermissionError:
             print(tpe_results)
 

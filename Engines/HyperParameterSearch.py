@@ -161,11 +161,11 @@ class AnomalyOpt:
         print(float(np.sqrt(self.P) * np.std(r, ddof=0)))
 
 if __name__ == "__main__":
-    #data = pd.read_csv("C:\\Users\\apply\\Desktop\\JYH\\Quant Research\\Porfolio Optimization\\Optimizer\\Data\\return_2000_2018.csv", index_col="DATE")
-    #data = data.loc[:, data.columns != 'DATE'].fillna("0%").applymap(lambda x: float(x.split("%")[0]) / 100)
-    data = pd.read_csv(join(project_root, "Data/ret/ret_transformed.csv"), index_col="DATE")
-    data=data.loc[:, data.columns != 'DATE'].fillna(0).astype(float)#.applymap(lambda x: float(x.split("%")[0]) / 100)
+    data = pd.read_csv(join(project_root, "Data/return_2000_2018.csv"), index_col="DATE")
+    data = data.loc[:, data.columns != 'DATE'].fillna("0%").applymap(lambda x: float(x.split("%")[0]) / 100)
+    #data = pd.read_csv(join(project_root, "Data/ret/ret_transformed.csv"), index_col="DATE")
+    #data=data.loc[:, data.columns != 'DATE'].fillna(0).astype(float)#.applymap(lambda x: float(x.split("%")[0]) / 100)
 
     data.to_csv("cleanData.csv")
-    test = AnomalyOpt(data.iloc[3529:, :1000], 0.3) # use 2000-2010 to hyper-search 0:2515
+    test = AnomalyOpt(data.iloc[3529:], 0.3) # use 2000-2010 to hyper-search 0:2515
     test.summaryResult()
