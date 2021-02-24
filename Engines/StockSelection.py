@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 from multiprocessing import Pool
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 from itertools import product
-
+import  time
 
 class Markowitz:
 
@@ -79,7 +79,7 @@ class Markowitz:
         sigma_factors = pd.DataFrame(columns=self.asset_names)  # container of normalization factors
         test_start = look_back  # we start validation once enough data is available
 
-        for test_period in tqdm(range(test_start, num_periods, freq), desc='processed',leave=False, position=0):
+        for test_period in range(test_start, num_periods, freq):
 
             porfolio_universe, R_train_normalized, normalization_factors = self.preProcessing(test_period, look_back,
                                                                                               num_periods)
@@ -169,11 +169,27 @@ class Markowitz:
         r, W = self.train(grid_point)
         annualized_ret = float(self.P * np.mean(r))
         annualized_std = float(np.sqrt(self.P) * np.std(r, ddof=0))
-
+        meanWeigh = W.sum(axis=1).mean()
+        meanLeverage=  np.abs(W).sum(axis=1).mean()
         try:
             sharpe_ratio = annualized_ret/annualized_std
         except:
             sharpe_ratio = np.nan
+        output_file = join(output_path, 'intermedaite.csv')
+        state = False
+        while not state:
+            try:
+                if not os.path.isfile(output_file):
+                    pd.DataFrame(columns=['sharpe', 'Rho', 'kappa', 'look_back', 'rebalancing_frequency', 'weight', 'leverage']).to_csv(output_file, index=False)
+                df_output =  pd.read_csv(output_file)
+                new_df = pd.DataFrame(data=[[sharpe_ratio, *grid_point, meanWeigh,meanLeverage]], columns=['sharpe', 'Rho', 'kappa', 'look_back', 'rebalancing_frequency', 'weight', 'leverage'])
+                df_output = df_output.append(new_df, ignore_index=True)
+                df_output.to_csv(output_file, index=False)
+                state = True
+            except PermissionError:
+                time.sleep(10)
+
+
 
         return sharpe_ratio, annualized_ret
 
@@ -186,6 +202,7 @@ class Markowitz:
             current_sharpe= f'{sharpe_ratio:.2f}',
             refresh=True)
         pbar.update()
+
 
         return {'loss': - sharpe_ratio, 'status': STATUS_OK, "ret":ret}
 
@@ -207,7 +224,7 @@ class Markowitz:
             'rebalancing_frequency': hp.choice('rebalancing_frequency', self.gridDict['rebalancing_frequency'])
         }
 
-        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=100, timeout= 6 * 60 * 60, trials=trials,
+        best = fmin(self.f, space4mark, algo=tpe.suggest, max_evals=max_iter, timeout= 7 * 24 * 60 * 60, trials=trials,
                     show_progressbar=True)
         pbar.close()
 
@@ -228,8 +245,9 @@ class Markowitz:
 
         try:
             tpe_results.to_csv(join(output_path, 'search path_with_gross_exposure_2.csv'))
+            print("output in", join(output_path, 'search path_with_gross_exposure_2.csv'))
         except PermissionError:
-            print(tpe_results)
+            print('output fails',tpe_results)
 
         return best
 

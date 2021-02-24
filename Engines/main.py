@@ -19,9 +19,9 @@ if __name__ == '__main__':
     # anomaly
     # data = pd.read_csv(join(project_root, "Data/Anomaly_clean_2000_2019.csv"), index_col="DATE")
     data = pd.read_csv(join(project_root, "Data/return_2000_2018.csv"), index_col="DATE").applymap(lambda x: float(str(x).strip('%'))/100)
-    dictionary = {'Rho': (0.2, 0.5), 'kappa': (0, 100), 'look_back': (5,500),'rebalancing_frequency':[5, 21]}
+    dictionary = {'Rho': (0.2, 0.5), 'kappa': (0, 100), 'look_back': (5, 500),'rebalancing_frequency': [5, 10, 21]}
     model = Markowitz(data.iloc[3529:], dictionary)
-    model.BayesianHyperOpt(2)
+    model.BayesianHyperOpt(200)
 
 
     # print(model.evaluateSharpe({'Rho':0.201090702, 'kappa':0.228925325, 'look_back':342, 'rebalancing_frequency':5}))
